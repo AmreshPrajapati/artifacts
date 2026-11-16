@@ -1,0 +1,127 @@
+name: Alert on Self-Merged Pull Requests
+
+on:
+  workflow_call:
+    inputs:
+      repository_owner:
+        description: Repository owner
+        required: true
+        type: string
+      repository_name:
+        description: Repository name
+        required: true
+        type: string
+      pull_request_number:
+        description: Pull request number
+        required: true
+        type: number
+      pull_request_title:
+        description: Pull request title
+        required: true
+        type: string
+      pull_request_url:
+        description: Pull request URL
+        required: true
+        type: string
+      pull_request_merged_at:
+        description: Merge timestamp in ISO 8601 format
+        required: true
+        type: string
+      pull_request_merged:
+        description: Whether the pull request was merged
+        required: true
+        type: boolean
+      base_ref:
+        description: Pull request base branch
+        required: true
+        type: string
+      head_ref:
+        description: Pull request source branch
+        required: true
+        type: string
+      author_id:
+        description: Pull request author's numeric account ID
+        required: true
+        type: number
+      merger_id:
+        description: Numeric account ID of the person who merged the pull request
+        required: true
+        type: number
+      author_login:
+        description: Pull request author's login
+        required: true
+        type: string
+      merger_login:
+        description: Login of the person who merged the pull request
+        required: true
+        type: string
+    secrets:
+      slack_webhook_url:
+        description: Slack incoming webhook URL
+        required: true
+
+permissions: {}
+
+jobs:
+  notify-slack:
+    if: >-
+      inputs.pull_request_merged &&
+      inputs.base_ref == 'main' &&
+      inputs.author_id == inputs.merger_id
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send self-merge alert to Slack
+        uses: slackapi/slack-github-action@v2.1.1
+        with:
+          webhook: ${{ secrets.slack_webhook_url }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ${{ toJSON(format('Self-merged pull request #{0} in {1}/{2} was merged by @{3}.', inputs.pull_request_number, inputs.repository_owner, inputs.repository_name, inputs.author_login)) }},
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Self-Merged Pull Request Detected",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ${{ toJSON(format('Pull request <{0}|#{1}> was merged by its author.', inputs.pull_request_url, inputs.pull_request_number)) }}
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Repository:* {0}/{1}', inputs.repository_owner, inputs.repository_name)) }}
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Pull request:* <{0}|#{1} — {2}>', inputs.pull_request_url, inputs.pull_request_number, inputs.pull_request_title)) }}
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Author:* @{0}', inputs.author_login)) }}
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Merged by:* @{0}', inputs.merger_login)) }}
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Branch:* {0} → {1}', inputs.head_ref, inputs.base_ref)) }}
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": ${{ toJSON(format('*Merged at:* {0}', inputs.pull_request_merged_at)) }}
+                    }
+                  ]
+                }
+              ]
+            }

@@ -1,0 +1,136 @@
+name: GitOps Workflow Dispatcher
+
+on:
+  workflow_call:
+    inputs:
+      repository_owner:
+        description: Repository owner
+        required: true
+        type: string
+      repository_name:
+        description: Repository name
+        required: true
+        type: string
+      pull_request_number:
+        description: Pull request number
+        required: true
+        type: number
+      pull_request_title:
+        description: Pull request title
+        required: true
+        type: string
+      pull_request_body:
+        description: Pull request description
+        required: false
+        type: string
+      pull_request_url:
+        description: Pull request URL
+        required: true
+        type: string
+      pull_request_state:
+        description: Pull request state
+        required: true
+        type: string
+      pull_request_merged:
+        description: Whether the pull request was merged
+        required: true
+        type: boolean
+      pull_request_merged_at:
+        description: Time the pull request was merged
+        required: false
+        type: string
+      pull_request_draft:
+        description: Whether the pull request is a draft
+        required: true
+        type: boolean
+      pull_request_labels:
+        description: Pull request labels as a JSON array
+        required: true
+        type: string
+      base_ref:
+        description: Pull request base branch
+        required: true
+        type: string
+      base_sha:
+        description: Pull request base commit SHA
+        required: true
+        type: string
+      head_ref:
+        description: Pull request source branch
+        required: true
+        type: string
+      head_sha:
+        description: Pull request source commit SHA
+        required: true
+        type: string
+      author_id:
+        description: Pull request author's numeric account ID
+        required: true
+        type: number
+      merger_id:
+        description: Numeric account ID of the person who merged the pull request
+        required: false
+        type: number
+      author_login:
+        description: Pull request author's login
+        required: true
+        type: string
+      merger_login:
+        description: Login of the person who merged the pull request
+        required: false
+        type: string
+      event_action:
+        description: Action that triggered the workflow
+        required: true
+        type: string
+    secrets:
+      slack_webhook_url:
+        description: Slack incoming webhook URL
+        required: true
+
+permissions:
+  pull-requests: write
+
+jobs:
+  self-merge-alert:
+    uses: ./.github/workflows/self-merge-alerts.yaml
+    secrets:
+      slack_webhook_url: ${{ secrets.slack_webhook_url }}
+    with:
+      repository_owner: ${{ inputs.repository_owner }}
+      repository_name: ${{ inputs.repository_name }}
+      pull_request_number: ${{ inputs.pull_request_number }}
+      pull_request_title: ${{ inputs.pull_request_title }}
+      pull_request_url: ${{ inputs.pull_request_url }}
+      pull_request_merged_at: ${{ inputs.pull_request_merged_at }}
+      pull_request_merged: ${{ inputs.pull_request_merged }}
+      base_ref: ${{ inputs.base_ref }}
+      head_ref: ${{ inputs.head_ref }}
+      author_id: ${{ inputs.author_id }}
+      merger_id: ${{ inputs.merger_id }}
+      author_login: ${{ inputs.author_login }}
+      merger_login: ${{ inputs.merger_login }}
+
+  self-merge-warning:
+    uses: ./.github/workflows/self-merge-warning.yaml
+    with:
+      repository_owner: ${{ inputs.repository_owner }}
+      repository_name: ${{ inputs.repository_name }}
+      pull_request_number: ${{ inputs.pull_request_number }}
+      pull_request_title: ${{ inputs.pull_request_title }}
+      pull_request_body: ${{ inputs.pull_request_body }}
+      pull_request_url: ${{ inputs.pull_request_url }}
+      pull_request_state: ${{ inputs.pull_request_state }}
+      pull_request_merged: ${{ inputs.pull_request_merged }}
+      pull_request_merged_at: ${{ inputs.pull_request_merged_at }}
+      pull_request_draft: ${{ inputs.pull_request_draft }}
+      pull_request_labels: ${{ inputs.pull_request_labels }}
+      base_ref: ${{ inputs.base_ref }}
+      base_sha: ${{ inputs.base_sha }}
+      head_ref: ${{ inputs.head_ref }}
+      head_sha: ${{ inputs.head_sha }}
+      author_id: ${{ inputs.author_id }}
+      merger_id: ${{ inputs.merger_id }}
+      author_login: ${{ inputs.author_login }}
+      merger_login: ${{ inputs.merger_login }}
+      event_action: ${{ inputs.event_action }}

@@ -1,0 +1,37 @@
+name: Dispatch GitOps Workflows
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  dispatch-self-merge-warning:
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/gitops-dispatcher.yaml
+    secrets:
+      slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+    with:
+      repository_owner: ${{ github.repository_owner }}
+      repository_name: ${{ github.event.repository.name }}
+      pull_request_number: ${{ github.event.pull_request.number }}
+      pull_request_title: ${{ github.event.pull_request.title }}
+      pull_request_body: ${{ github.event.pull_request.body || '' }}
+      pull_request_url: ${{ github.event.pull_request.html_url }}
+      pull_request_state: ${{ github.event.pull_request.state }}
+      pull_request_merged: ${{ github.event.pull_request.merged }}
+      pull_request_merged_at: ${{ github.event.pull_request.merged_at || '' }}
+      pull_request_draft: ${{ github.event.pull_request.draft }}
+      pull_request_labels: ${{ toJSON(github.event.pull_request.labels) }}
+      base_ref: ${{ github.event.pull_request.base.ref }}
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_ref: ${{ github.event.pull_request.head.ref }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+      author_id: ${{ github.event.pull_request.user.id }}
+      merger_id: ${{ github.event.pull_request.merged_by.id || 0 }}
+      author_login: ${{ github.event.pull_request.user.login }}
+      merger_login: ${{ github.event.pull_request.merged_by.login || '' }}
+      event_action: ${{ github.event.action }}
