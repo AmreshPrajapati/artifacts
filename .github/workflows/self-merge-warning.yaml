@@ -1,0 +1,165 @@
+name: Dispatch GitOps Workflows
+
+on:
+  workflow_call:
+    inputs:
+      repository_owner:
+        description: Repository owner
+        required: true
+        type: string
+      repository_name:
+        description: Repository name
+        required: true
+        type: string
+      pull_request_number:
+        description: Pull request number
+        required: true
+        type: number
+      pull_request_title:
+        description: Pull request title
+        required: true
+        type: string
+      pull_request_body:
+        description: Pull request description
+        required: false
+        type: string
+      pull_request_url:
+        description: Pull request URL
+        required: true
+        type: string
+      pull_request_state:
+        description: Pull request state
+        required: true
+        type: string
+      pull_request_merged:
+        description: Whether the pull request was merged
+        required: true
+        type: boolean
+      pull_request_merged_at:
+        description: Time the pull request was merged
+        required: false
+        type: string
+      pull_request_draft:
+        description: Whether the pull request is a draft
+        required: true
+        type: boolean
+      pull_request_labels:
+        description: Pull request labels as a JSON array
+        required: true
+        type: string
+      base_ref:
+        description: Pull request base branch
+        required: true
+        type: string
+      base_sha:
+        description: Pull request base commit SHA
+        required: true
+        type: string
+      head_ref:
+        description: Pull request source branch
+        required: true
+        type: string
+      head_sha:
+        description: Pull request source commit SHA
+        required: true
+        type: string
+      author_id:
+        description: Pull request author's numeric account ID
+        required: true
+        type: number
+      merger_id:
+        description: Numeric account ID of the person who merged the pull request
+        required: false
+        type: number
+      author_login:
+        description: Pull request author's login
+        required: true
+        type: string
+      merger_login:
+        description: Login of the person who merged the pull request
+        required: false
+        type: string
+      event_action:
+        description: Action that triggered the workflow
+        required: true
+        type: string
+
+permissions:
+  pull-requests: write
+
+jobs:
+  request-comment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check merger and request justification
+        uses: actions/github-script@v7
+        env:
+          REPOSITORY_OWNER: ${{ inputs.repository_owner }}
+          REPOSITORY_NAME: ${{ inputs.repository_name }}
+          PULL_REQUEST_NUMBER: ${{ inputs.pull_request_number }}
+          PULL_REQUEST_TITLE: ${{ inputs.pull_request_title }}
+          PULL_REQUEST_BODY: ${{ inputs.pull_request_body }}
+          PULL_REQUEST_URL: ${{ inputs.pull_request_url }}
+          PULL_REQUEST_STATE: ${{ inputs.pull_request_state }}
+          PULL_REQUEST_MERGED: ${{ inputs.pull_request_merged }}
+          PULL_REQUEST_MERGED_AT: ${{ inputs.pull_request_merged_at }}
+          PULL_REQUEST_DRAFT: ${{ inputs.pull_request_draft }}
+          PULL_REQUEST_LABELS: ${{ inputs.pull_request_labels }}
+          BASE_REF: ${{ inputs.base_ref }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_REF: ${{ inputs.head_ref }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          AUTHOR_ID: ${{ inputs.author_id }}
+          MERGER_ID: ${{ inputs.merger_id }}
+          AUTHOR_LOGIN: ${{ inputs.author_login }}
+          MERGER_LOGIN: ${{ inputs.merger_login }}
+          EVENT_ACTION: ${{ inputs.event_action }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PULL_REQUEST_NUMBER);
+            const repository = {
+              owner: process.env.REPOSITORY_OWNER,
+              repo: process.env.REPOSITORY_NAME
+            };
+
+            if (process.env.PULL_REQUEST_MERGED !== 'true' || process.env.BASE_REF !== 'main') {
+              return;
+            }
+
+            if (!process.env.MERGER_ID || process.env.AUTHOR_ID !== process.env.MERGER_ID) {
+              core.info('PR author and merger are different. No comment needed.');
+              return;
+            }
+
+            const marker = '<!-- self-merge-comment-request -->';
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                ...repository,
+                issue_number: prNumber,
+                per_page: 100
+              }
+            );
+
+            if (comments.some(comment =>
+              comment.user?.type === 'Bot' &&
+              comment.body?.includes(marker)
+            )) {
+              core.info('A comment request already exists.');
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              ...repository,
+              issue_number: prNumber,
+              body: [
+                marker,
+                '> [!CAUTION]',
+                '> **Self-merge requires an explanation**',
+                '>',
+                `@${process.env.AUTHOR_LOGIN}, you merged your own PR into \`main\`.`,
+                '> Please comment with the reason for the self-merge and any relevant approval or change-ticket reference.'
+              ].join('\n')
+            });
